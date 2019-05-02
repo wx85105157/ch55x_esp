@@ -13,6 +13,17 @@
 #include <ch554_usb.h>
 #include <debug.h>
 
+#define ESP_DRT		CAP1_
+//#define ESP_RTS		TXD1
+
+volatile __idata uint8_t DTRtime = 0;
+//#define HARD_ESP_CTRL 1
+
+#ifndef HARD_ESP_CTRL
+volatile __idata uint8_t Esp_Boot_Chk = 0;
+volatile __idata uint8_t Esp_Require_Reset = 0;
+#endif
+
 __xdata __at (0x0000) uint8_t  Ep0Buffer[DEFAULT_ENDP0_SIZE];	   //端点0 OUT&IN缓冲区，必须是偶地址
 __xdata __at (0x0040) uint8_t  Ep1Buffer[MAX_PACKET_SIZE];		//端点1 IN 发送缓冲区
 __xdata __at (0x0200) uint8_t  Ep2Buffer[MAX_PACKET_SIZE];	  //端点2 OUT接收缓冲区
@@ -77,12 +88,7 @@ volatile __idata uint8_t Require_DFU = 0;
 volatile __idata uint8_t soft_dtr = 0;
 volatile __idata uint8_t soft_rts = 0;
 
-#define HARD_ESP_CTRL 1
 
-#ifndef HARD_ESP_CTRL
-volatile __idata uint8_t Esp_Boot_Chk = 0;
-volatile __idata uint8_t Esp_Require_Reset = 0;
-#endif
 
 /*******************************************************************************
 * Function Name  : USBDeviceCfg()
@@ -347,30 +353,36 @@ void DeviceInterrupt(void) __interrupt (INT_NO_USB)					   //USB中断服务程�
 								}
 								if(soft_dtr == 1 && soft_rts == 1)
 								{
-									TXD1 = 1;
-									CAP1 = 1;
+									ESP_DRT = 1;
+									//ESP_RTS = 1;
 								}
 								if(soft_dtr == 0 && soft_rts == 0)
 								{
-									TXD1 = 1;
-									CAP1 = 1;
+									ESP_DRT = 1;
+									//ESP_RTS = 1;
 								}
 								if(soft_dtr == 0 && soft_rts == 1)
 								{
-									TXD1 = 1;
-									CAP1 = 0;
+									ESP_DRT = 1;
+									//ESP_RTS = 0;
 								}
 								if(soft_dtr == 1 && soft_rts == 0)
 								{
-									TXD1 = 0;
-									CAP1 = 1;
+									ESP_DRT = 0;
+									//ESP_RTS = 1;
 								}
 							}
 #else
-							if(Esp_Require_Reset == 3)
+							if(UsbSetupBuf->wValueH & 0x01)
 							{
-								CAP1 = 0;
-								Esp_Require_Reset = 4;
+								if(UsbSetupBuf->wValueL & 0x01) //DTR
+								{
+									ESP_DRT = 1;
+								}
+								else
+								{
+									ESP_DRT = 0;
+								}
 							}
 #endif
 							len = 0;
@@ -901,6 +913,11 @@ main()
 
 	while(1)
 	{
+		if(ESP_DRT==0) 
+		{
+			if((++DTRtime)==0)ESP_DRT=1;
+		}
+		else DTRtime=0;
 		if(UsbConfig)
 		{
 			if(UpPoint1_Busy == 0)
@@ -962,17 +979,17 @@ main()
 			{
 				if((uint16_t)(SOF_Count - Esp_Stage) == 1)
 				{
-					TXD1 = 1; //IO0
-					CAP1 = 0;
+					ESP_DRT = 1; //IO0
+					//ESP_RTS = 0;
 				}
 				if((uint16_t)(SOF_Count - Esp_Stage) == 2)
 				{
-					TXD1 = 0;
-					CAP1 = 1; //EN high
+					ESP_DRT = 0;
+					//ESP_RTS = 1; //EN high
 				}
 				if((uint16_t)(SOF_Count - Esp_Stage) >= 3)
 				{
-					TXD1 = 1;
+					ESP_DRT = 1;
 				}
 				if((uint16_t)(SOF_Count - Esp_Stage) >= 1000)
 				{
@@ -982,7 +999,7 @@ main()
 			if(Esp_Require_Reset == 4)
 			{
 				Esp_Require_Reset = 0;
-				CAP1 = 1;
+				//ESP_RTS = 1;
 			}
 #endif
 
