@@ -3,3 +3,6 @@
 *.bin
 *.ihx
 *.hex
+
+.vscode
+src

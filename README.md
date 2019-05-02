@@ -47,3 +47,9 @@ Authors
 Kongou Hikari <kongouhikari@qq.com>
 
 
+git clone https://github.com/wx85105157/ch55x_esp
+cd ch55x_esp/ch554_sdcc/
+git submodule init
+git submodule update
+cd ../src/
+make
